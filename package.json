@@ -1,8 +1,26 @@
 {
-  "name": "foodwastereduction_ai",
+  "name": "verdeai",
+  "private": true,
   "version": "1.0.0",
-  "dependencies": {
-    "axios": "^1.6.0",
-    "@azure/cosmos": "^4.0.0"
+  "packageManager": "npm@11.11.1",
+  "description": "VerdeAI — AI-powered food-waste reduction platform for restaurants. Monorepo: Azure Functions batch jobs, a REST+GraphQL orchestration API, and a React dashboard.",
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

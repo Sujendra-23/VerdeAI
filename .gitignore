@@ -13,7 +13,6 @@ Publish
 *.Cache
 project.lock.json
 
-/packages
 /TestResults
 
 /tools/NuGet.exe
@@ -26,6 +25,14 @@ local.settings.json
 
 node_modules
 dist
+.turbo
+coverage
+playwright-report
+test-results
+blob-report
+.env.local
+.env.*.local
+*.tsbuildinfo
 
 # Local python packages
 .python_packages/
@@ -48,3 +55,4 @@ __pycache__/
 __blobstorage__
 __queuestorage__
 __azurite_db*__.json
+.rocketride/

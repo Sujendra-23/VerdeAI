@@ -1,0 +1,13 @@
+{
+  "name": "@verdeai/functions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Azure Functions: nightly forecast + waste-risk batch jobs, and the AI explain endpoint.",
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "@azure/cosmos": "^4.0.0"
+  }
+}

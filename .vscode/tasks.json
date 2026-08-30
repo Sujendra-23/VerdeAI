@@ -7,17 +7,35 @@
 			"command": "host start",
 			"problemMatcher": "$func-node-watch",
 			"isBackground": true,
-			"dependsOn": "npm install (functions)"
+			"dependsOn": "npm install (functions)",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/functions"
+			}
 		},
 		{
 			"type": "shell",
 			"label": "npm install (functions)",
-			"command": "npm install"
+			"command": "npm install",
+			"options": {
+				"cwd": "${workspaceFolder}/apps/functions"
+			}
 		},
 		{
 			"type": "shell",
 			"label": "npm prune (functions)",
 			"command": "npm prune --production",
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}/apps/functions"
+			}
+		},
+		{
+			"type": "shell",
+			"label": "dev: api + web (turbo)",
+			"command": "npm run dev",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
 			"problemMatcher": []
 		}
 	]
