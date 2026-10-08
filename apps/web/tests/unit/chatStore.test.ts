@@ -31,3 +31,10 @@ describe("chatStore", () => {
     expect(useChatStore.getState().getMessages("R002:2026-02-05")).toHaveLength(1);
   });
 });
+
+describe("chatStore selectors", () => {
+  it("returns the same array for an empty thread so selectors don't re-render forever", () => {
+    const { getMessages } = useChatStore.getState();
+    expect(getMessages("R001:2026-02-05")).toBe(getMessages("R001:2026-02-05"));
+  });
+});

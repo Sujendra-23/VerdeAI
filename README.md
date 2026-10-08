@@ -54,6 +54,28 @@ plus a GraphQL `explainChat` mutation), falling back to a deterministic
 templated explanation whenever Azure OpenAI isn't configured — so the
 dashboard is fully demoable with zero Azure resources provisioned.
 
+### Multilingual chatbot
+
+The AI Explain chat answers in the manager's language. `language` is optional and
+is `auto` (default) or one of `en`, `es`, `fr`, `de`, `pt`, `it`, `hi`, `zh`, `ja`:
+
+- **`auto`** detects the language of the latest identifiable user message
+  (Unicode script for Hindi/Chinese/Japanese, common-word scoring for the Latin-script
+  languages), falls back to earlier messages, then English. A bare menu-item name
+  carries no language signal, so it keeps the conversation's language.
+- **Azure OpenAI path:** the system prompt tells the model which language to reply in;
+  menu item names are kept as written in the data.
+- **Offline/template path:** the deterministic fallback has hand-written wording for all
+  nine languages, so the demo stays multilingual without any Azure resources.
+- The response includes the `language` that was used. The dashboard has a language
+  selector (with the panel text localized) and requests a fresh overview in the new
+  language when it changes.
+
+Limits: detection is heuristic and meant for short questions; the template wording
+and UI strings were written by hand, not reviewed by native speakers; the Azure OpenAI
+path is covered by tests with a mocked HTTP call only (no live Azure run); and the
+standalone `VerdeAI_Explain` Azure Function is unchanged and still English-only.
+
 ## Tech stack
 
 - Azure Functions (Node.js) — nightly forecast + waste-risk batch jobs
@@ -218,13 +240,13 @@ REST:
 - `GET /api/restaurants`
 - `GET /api/forecasts?restaurantId=&date=`
 - `GET /api/waste-risk?restaurantId=&date=`
-- `POST /api/explain` — `{ restaurantId, date }`
-- `POST /api/explain/chat` — `{ restaurantId, date, messages: [{ role, content }] }`
+- `POST /api/explain` — `{ restaurantId, date, language? }`
+- `POST /api/explain/chat` — `{ restaurantId, date, messages: [{ role, content }], language? }` → `{ reply, source, language }`
 
 GraphQL (`POST /graphql`):
 - `restaurants`, `forecasts(restaurantId, date)`, `wasteRisk(restaurantId, date)`
 - `insight(restaurantId, date)` — forecasts + waste risk + explanation in one round trip
-- `explainChat(restaurantId, date, messages)` mutation
+- `explainChat(restaurantId, date, messages, language)` mutation
 
 ### Example output
 

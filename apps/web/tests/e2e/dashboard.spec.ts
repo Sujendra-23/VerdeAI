@@ -80,3 +80,38 @@ test("AI Explain chat seeds the explanation and answers a follow-up question", a
 
   await expect(page.getByText(/keep you ahead of the surplus/i)).toBeVisible();
 });
+
+test("AI Explain chatbot answers in the language chosen in the selector", async ({ page }) => {
+  const requests: Array<{ language?: string; messages: unknown[] }> = [];
+  await page.route("**/api/explain/chat", (route) => {
+    const body = route.request().postDataJSON();
+    requests.push(body);
+    const spanish = body.language === "es";
+    return route.fulfill({
+      json: {
+        reply: {
+          role: "assistant",
+          content: spanish
+            ? "Reduce la preparación del Grilled Chicken Bowl en un 15 %."
+            : "Reducing prep by 15% should keep you ahead of the surplus.",
+        },
+        source: "template",
+        language: spanish ? "es" : "en",
+      },
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "AI Explain" }).click();
+  await expect(page.getByText(/reduce prep by 15%/i)).toBeVisible();
+
+  await page.getByLabel(/reply language/i).selectOption("es");
+  await expect(page.getByText(/Reduce la preparación del Grilled Chicken Bowl/)).toBeVisible();
+  expect(requests[0]).toMatchObject({ language: "es", messages: [] });
+  await expect(page.getByRole("button", { name: "Enviar" })).toBeVisible();
+
+  await page.getByPlaceholder(/pregunta por un plato/i).fill("¿Qué pasa con el Grilled Chicken Bowl?");
+  await page.getByRole("button", { name: "Enviar" }).click();
+  await expect(page.getByText(/Reduce la preparación/)).toHaveCount(2);
+  expect(requests[1]).toMatchObject({ language: "es" });
+});

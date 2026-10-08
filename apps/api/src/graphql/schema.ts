@@ -1,5 +1,5 @@
-import { createSchema } from "graphql-yoga";
-import type { ChatMessage } from "@verdeai/shared-types";
+import { createGraphQLError, createSchema } from "graphql-yoga";
+import { isLanguagePreference, type ChatMessage, type LanguagePreference } from "@verdeai/shared-types";
 import type { Repository } from "../data/repository.js";
 import type { ExplainService } from "../services/explainService.js";
 
@@ -73,6 +73,7 @@ const typeDefs = /* GraphQL */ `
   type ExplainChatResult {
     reply: ChatMessageResult!
     source: ExplanationSource!
+    language: String!
   }
 
   type Query {
@@ -87,6 +88,8 @@ const typeDefs = /* GraphQL */ `
       restaurantId: String!
       date: String!
       messages: [ChatMessageInput!]!
+      """'auto' (default) or a code such as en, es, fr, de, pt, it, hi, zh, ja"""
+      language: String
     ): ExplainChatResult!
   }
 `;
@@ -132,17 +135,27 @@ export const schema = createSchema<GraphQLContext>({
     Mutation: {
       explainChat: async (
         _parent,
-        args: { restaurantId: string; date: string; messages: ChatMessage[] },
+        args: {
+          restaurantId: string;
+          date: string;
+          messages: ChatMessage[];
+          language?: string | null;
+        },
         ctx,
       ) => {
+        if (args.language != null && !isLanguagePreference(args.language)) {
+          throw createGraphQLError("language must be 'auto' or a supported language code");
+        }
         const result = await ctx.explainService.chat(
           args.restaurantId,
           args.date,
           args.messages,
+          (args.language ?? "auto") as LanguagePreference,
         );
         return {
           reply: result.reply,
           source: toSourceEnum(result.source),
+          language: result.language,
         };
       },
     },
