@@ -50,15 +50,45 @@ export interface ChatMessage {
   content: string;
 }
 
+/** Languages the explain chatbot can answer in. `nativeName` is what the selector shows. */
+export const SUPPORTED_LANGUAGES = [
+  { code: "en", name: "English", nativeName: "English" },
+  { code: "es", name: "Spanish", nativeName: "Español" },
+  { code: "fr", name: "French", nativeName: "Français" },
+  { code: "de", name: "German", nativeName: "Deutsch" },
+  { code: "pt", name: "Portuguese", nativeName: "Português" },
+  { code: "it", name: "Italian", nativeName: "Italiano" },
+  { code: "hi", name: "Hindi", nativeName: "हिन्दी" },
+  { code: "zh", name: "Chinese", nativeName: "中文" },
+  { code: "ja", name: "Japanese", nativeName: "日本語" },
+] as const;
+
+export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];
+
+/** `auto` = answer in the language the manager wrote their last message in. */
+export type LanguagePreference = LanguageCode | "auto";
+
+export function isLanguageCode(value: unknown): value is LanguageCode {
+  return SUPPORTED_LANGUAGES.some((l) => l.code === value);
+}
+
+export function isLanguagePreference(value: unknown): value is LanguagePreference {
+  return value === "auto" || isLanguageCode(value);
+}
+
 export interface ExplainChatRequest {
   restaurantId: string;
   date: string;
   messages: ChatMessage[];
+  /** Defaults to `auto` when omitted. */
+  language?: LanguagePreference;
 }
 
 export interface ExplainChatResponse {
   reply: ChatMessage;
   source: "azure-openai" | "template";
+  /** The language the reply was produced in (after auto-detection). */
+  language: LanguageCode;
 }
 
 /** Combined view used by the GraphQL `insight` query — one round trip, three sources. */

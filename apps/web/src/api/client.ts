@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   ExplainChatResponse,
+  LanguagePreference,
   Restaurant,
   RestaurantInsight,
 } from "@verdeai/shared-types";
@@ -88,9 +89,10 @@ export function postExplainChat(
   restaurantId: string,
   date: string,
   messages: ChatMessage[],
+  language: LanguagePreference = "auto",
 ): Promise<ExplainChatResponse> {
   return http<ExplainChatResponse>("/api/explain/chat", {
     method: "POST",
-    body: JSON.stringify({ restaurantId, date, messages }),
+    body: JSON.stringify({ restaurantId, date, messages, language }),
   });
 }
