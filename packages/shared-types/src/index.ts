@@ -107,3 +107,20 @@ export function computeRiskLevel(
 ): RiskLevel {
   return predictedQuantity > historicalAverage * 1.2 ? "HIGH" : "LOW";
 }
+
+/** A food-bank pickup booked for surplus of a forecast item. */
+export type BookingStatus = "confirmed" | "cancelled";
+
+export interface Booking {
+  id: string;
+  restaurantId: string;
+  date: string; // ISO date the pickup happens
+  slot: string; // "HH:MM" start of a 30-minute pickup slot
+  item: string;
+  quantity: number;
+  contactName: string;
+  notes?: string;
+  status: BookingStatus;
+  createdAt: string;
+  updatedAt: string;
+}
