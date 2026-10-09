@@ -242,11 +242,64 @@ REST:
 - `GET /api/waste-risk?restaurantId=&date=`
 - `POST /api/explain` — `{ restaurantId, date, language? }`
 - `POST /api/explain/chat` — `{ restaurantId, date, messages: [{ role, content }], language? }` → `{ reply, source, language }`
+- `POST /api/bookings` — book a food-bank pickup for forecast surplus: `{ restaurantId, date, slot, item, quantity, contactName, notes? }` → `201` (see [Bookings](#bookings-writes-validation-idempotency-migrations))
+- `GET /api/bookings?restaurantId=&date=`, `GET /api/bookings/:id`, `POST /api/bookings/:id/cancel`
 
 GraphQL (`POST /graphql`):
 - `restaurants`, `forecasts(restaurantId, date)`, `wasteRisk(restaurantId, date)`
 - `insight(restaurantId, date)` — forecasts + waste risk + explanation in one round trip
 - `explainChat(restaurantId, date, messages, language)` mutation
+
+### Bookings: writes, validation, idempotency, migrations
+
+`POST /api/bookings` is the API's first write path. A restaurant reserves a 30-minute food-bank
+pickup slot (`HH:00` or `HH:30`, 06:00-22:00) for surplus of an item that is on that day's forecast.
+Bookings live in Cosmos DB (`bookings` container) in Cosmos mode and in memory in mock-data mode, so
+the demo still runs with zero Azure resources (bookings made in mock mode vanish on restart).
+
+| Situation | Response |
+|---|---|
+| Created | `201`, `Location: /api/bookings/:id` |
+| Retry with the same `Idempotency-Key` and body | `200`, same booking, `Idempotent-Replayed: true` |
+| Same key, different body | `422 idempotency_key_reused` |
+| Malformed key / body / query / id, unknown fields, bad date or slot, non-integer quantity | `400 validation_error` (per-field `details`), `invalid_idempotency_key`, `invalid_json` |
+| Oversized body | `413 payload_too_large` |
+| Unknown restaurant / booking | `404` |
+| Item not on that day's forecast, or quantity above the forecast | `422 unknown_item` / `quantity_exceeds_forecast` |
+| Slot already held | `409 slot_taken` (or `duplicate_booking` if it is the identical request) |
+| Cancel (idempotent) | `200`; cancelling frees the slot and keeps the record |
+
+Requests are validated with [zod](https://zod.dev) (`src/bookings/schema.ts`). With an
+`Idempotency-Key`, the booking id is derived from the restaurant and key, so a retry (even a
+concurrent one) resolves to the same stored document with no separate idempotency table and no
+"in progress" window. At most one confirmed booking per restaurant/date/slot is enforced by the
+store (a Cosmos unique key on `/slotKey`), not by a check-then-insert.
+
+**Migrations.** Cosmos has no schema DDL, so migrations manage what is versioned: containers,
+partition and unique-key policies, indexing policy, backfills. They live in `src/migrations/versions`,
+run in order, and are recorded in a `_migrations` container with a checksum of each file. In Cosmos
+mode the API applies pending migrations on startup (set `MIGRATE_ON_STARTUP=false` to run them as a
+separate step):
+
+```bash
+npm run migrate -w @verdeai/api              # apply pending
+npm run migrate -w @verdeai/api -- --status  # show applied/pending, change nothing
+```
+
+The runner refuses to start if an applied migration's file was edited, if the database has
+migrations this build does not know, or if a new migration is numbered below an applied one; a lock
+document keeps two replicas from migrating at once. Migrations must be idempotent. Never edit an
+applied migration; add the next number.
+
+**What was verified.** The suite (`npm test -w @verdeai/api`) covers the routes, service, store
+contract and migration runner against an in-memory store and a *model* of Cosmos
+(`test/support/fakeCosmos.ts`), which is only as faithful as that model. The same store contract and
+migrations were also run against the **Cosmos DB vNext Linux emulator** (not a real Azure account)
+via `test/cosmosEmulator.test.ts`, gated on `COSMOS_EMULATOR_ENDPOINT` / `COSMOS_EMULATOR_KEY`
+(see the test file for the `docker run` line), and the API was exercised end to end against that
+emulator (startup migrations, restart, idempotent replay, conflicts, cancel). Nothing was run
+against a real Azure Cosmos DB account, so RU cost, latency, and any behaviour the emulator differs
+on are untested. Bookings have no authentication yet, like the rest of this API.
 
 ### Example output
 
