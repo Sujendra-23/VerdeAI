@@ -17,9 +17,12 @@ npm workspaces + Turborepo.
 apps/
   functions/     Azure Functions (Node.js) — nightly batch jobs + the AI explain endpoint
   api/           Express + GraphQL Yoga — REST and GraphQL over Cosmos DB (or seeded mock data)
-  web/           React + TypeScript + Vite dashboard
+  web/           React + TypeScript + Vite dashboard / PWA
+  ios/           SwiftUI app and Xcode project
+  android/       React Native Android app (Kotlin host + Metro)
 packages/
-  shared-types/  TypeScript types shared by api and web
+  shared-types/  TypeScript types shared by API, web, and Android
+  mobile-core/   Native API client, UI translations, and public API configuration
 ```
 
 ## Architecture
@@ -125,7 +128,14 @@ npm run lint        # eslint — apps/web
 
 ## Deployment
 
-Nothing below is deployed yet — this documents the steps for when it is.
+An Azure deployment workflow now packages the API and web dashboard together on
+one HTTPS address, then configures the mobile apps after the endpoint
+passes its health check. Run `az login` and `npm run deploy:azure` from the repo
+root. See [the hosting guide](docs/hosting.md) for the F1 Free plan, resource
+names, packaging, and verification. The web dashboard and API are deployed at [https://verdeai-api-adb362e8.azurewebsites.net](https://verdeai-api-adb362e8.azurewebsites.net).
+The deployment currently serves seeded demo data and localized template explanations.
+
+The alternatives below describe separate frontend/backend hosting options.
 
 ### 0. Push to GitHub
 
@@ -243,3 +253,28 @@ Improved forecast accuracy by ~25%
 Reduced pipeline latency by 40%
 
 Helped pilot restaurants cut food waste by 15–20%
+
+## Mobile apps and installation
+
+VerdeAI uses **SwiftUI for iOS**, **React Native for Android**, and React + Vite
+for the web/PWA. Both native apps call the existing REST/GraphQL API directly.
+See [the mobile setup guide](docs/mobile.md) for phone previews, API configuration,
+build commands, offline behavior, and release steps.
+
+
+## Languages
+
+The web, iOS, and Android interfaces support **English, Kannada, Hindi, French,
+and Spanish**. Choose a language in the header. VerdeAI detects a supported
+browser/device language on first use and remembers your choice on that device.
+Navigation, forecast labels, risk indicators, loading/error states, installation
+instructions, dates, and numbers follow the selected language. AI explanations
+and demo fallback replies use it too. Restaurant and menu names retain their
+original names; conversation histories are separate for each language.
+
+REST explanation requests accept optional `locale` (`en`, `kn`, `hi`, `fr`, `es`),
+and GraphQL `insight`/`explainChat` accept the same optional argument. Existing
+clients default to English. Regional values such as `kn-IN` are supported;
+unrecognized values fall back to English.
+
+See [the localization guide](docs/languages.md) for maintenance and testing.

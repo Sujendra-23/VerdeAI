@@ -3,10 +3,11 @@
   "private": true,
   "version": "1.0.0",
   "packageManager": "npm@11.11.1",
-  "description": "VerdeAI — AI-powered food-waste reduction platform for restaurants. Monorepo: Azure Functions batch jobs, a REST+GraphQL orchestration API, and a React dashboard.",
+  "description": "VerdeAI \u2014 AI-powered food-waste reduction platform for restaurants. Monorepo: Azure Functions batch jobs, a REST+GraphQL orchestration API, and a React dashboard.",
   "workspaces": [
     "apps/api",
     "apps/web",
+    "apps/android",
     "packages/*"
   ],
   "scripts": {
@@ -15,12 +16,18 @@
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
     "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "deploy:azure": "node scripts/deploy-azure.mjs",
+    "mobile:resources": "tsx scripts/generate-ios-resources.mts",
+    "mobile:ios": "npm run mobile:resources && open apps/ios/VerdeAI.xcodeproj",
+    "mobile:android": "npm run android -w apps/android",
+    "mobile:start": "npm run start -w apps/android"
   },
   "devDependencies": {
-    "turbo": "^2.3.3"
+    "turbo": "^2.3.3",
+    "tsx": "^4.19.2"
   },
   "engines": {
-    "node": ">=20"
+    "node": "^22.13.0 || ^24.3.0 || >=26.0.0"
   }
 }

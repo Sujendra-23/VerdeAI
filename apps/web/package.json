@@ -14,10 +14,11 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@verdeai/mobile-core": "*",
     "@tanstack/react-query": "^5.62.7",
     "@verdeai/shared-types": "*",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
@@ -39,6 +40,7 @@
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.18.2",
     "vite": "^6.0.7",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^3.0.0"
   }
 }

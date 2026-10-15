@@ -3,9 +3,10 @@ import type {
   ExplainChatResponse,
   Restaurant,
   RestaurantInsight,
+  SupportedLocale,
 } from "@verdeai/shared-types";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
@@ -36,8 +37,8 @@ export function fetchRestaurants(): Promise<Restaurant[]> {
 // trip — the concrete win GraphQL gives us over stitching together three
 // separate REST calls (which is what the plain REST endpoints below require).
 const INSIGHT_QUERY = /* GraphQL */ `
-  query Insight($restaurantId: String!, $date: String!) {
-    insight(restaurantId: $restaurantId, date: $date) {
+  query Insight($restaurantId: String!, $date: String!, $locale: String!) {
+    insight(restaurantId: $restaurantId, date: $date, locale: $locale) {
       restaurant {
         restaurantId
         name
@@ -68,15 +69,17 @@ const INSIGHT_QUERY = /* GraphQL */ `
 export async function fetchInsight(
   restaurantId: string,
   date: string,
+  locale: SupportedLocale = "en",
 ): Promise<RestaurantInsight> {
   const res = await fetch(`${API_URL}/graphql`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       query: INSIGHT_QUERY,
-      variables: { restaurantId, date },
+      variables: { restaurantId, date, locale },
     }),
   });
+  if (!res.ok) throw new Error(`Insight request failed: ${res.status}`);
   const json = await res.json();
   if (json.errors?.length) {
     throw new Error(json.errors[0].message as string);
@@ -88,9 +91,10 @@ export function postExplainChat(
   restaurantId: string,
   date: string,
   messages: ChatMessage[],
+  locale: SupportedLocale = "en",
 ): Promise<ExplainChatResponse> {
   return http<ExplainChatResponse>("/api/explain/chat", {
     method: "POST",
-    body: JSON.stringify({ restaurantId, date, messages }),
+    body: JSON.stringify({ restaurantId, date, messages, locale }),
   });
 }

@@ -6,7 +6,10 @@ import { schema, type GraphQLContext } from "./graphql/schema.js";
 import { createRestRouter } from "./rest/routes.js";
 import { ExplainService } from "./services/explainService.js";
 
-export function createServer(repository: Repository = createRepository()): Express {
+export function createServer(
+  repository: Repository = createRepository(),
+  options: { staticDirectory?: string } = {},
+): Express {
   const explainService = new ExplainService(repository);
   const app = express();
 
@@ -24,6 +27,11 @@ export function createServer(repository: Repository = createRepository()): Expre
     context: (): GraphQLContext => ({ repository, explainService }),
   });
   app.use("/graphql", yoga);
+
+  // A deployment can host the built dashboard and API on the same HTTPS origin.
+  if (options.staticDirectory) {
+    app.use(express.static(options.staticDirectory));
+  }
 
   return app;
 }

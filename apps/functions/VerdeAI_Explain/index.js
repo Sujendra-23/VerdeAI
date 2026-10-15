@@ -5,6 +5,10 @@ module.exports = async function (context, req) {
     try {
         const restaurantId = req.query.restaurantId || req.body.restaurantId;
         const date = req.query.date || req.body.date;
+        const requestedLocale = req.query.locale || req.body.locale;
+        const languages = { en: "English", kn: "Kannada", hi: "Hindi", fr: "French", es: "Spanish" };
+        const baseLocale = typeof requestedLocale === "string" ? requestedLocale.toLowerCase().split(/[-_]/)[0] : "en";
+        const locale = Object.hasOwn(languages, baseLocale) ? baseLocale : "en";
 
         if (!restaurantId || !date) {
             context.res = {
@@ -53,14 +57,15 @@ Here is the forecast and waste risk data:
 Forecast: ${JSON.stringify(forecastData)}
 Waste Risk: ${JSON.stringify(wasteData)}
 
-Write a clear, friendly explanation for the restaurant manager.
+Write a clear, friendly explanation for the restaurant manager in ${languages[locale]}.
+Keep menu item names exactly as supplied.
 `;
 
         const response = await axios.post(
             `${process.env.AZURE_OPENAI_ENDPOINT}openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-02-15-preview`,
             {
                 messages: [{ role: "user", content: prompt }],
-                max_tokens: 300
+                max_tokens: locale === "en" ? 300 : 1000
             },
             {
                 headers: {

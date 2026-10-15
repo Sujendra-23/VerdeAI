@@ -3,7 +3,7 @@ import { createRepository } from "./data/repository.js";
 import { createServer } from "./server.js";
 
 const repository = createRepository();
-const app = createServer(repository);
+const app = createServer(repository, { staticDirectory: process.env.STATIC_DIR });
 const port = Number(process.env.PORT ?? 4000);
 
 app.listen(port, () => {

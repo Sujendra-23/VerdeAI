@@ -1,21 +1,24 @@
 import { useInsight } from "../hooks/useInsight";
 import { useUiStore } from "../store/uiStore";
 
+import { useI18n } from "../i18n";
+
 export function WasteRiskPanel() {
+  const { t, date: formatDate } = useI18n();
   const restaurantId = useUiStore((s) => s.restaurantId);
   const date = useUiStore((s) => s.date);
-  const { data, isLoading, isError, error } = useInsight(restaurantId, date);
+  const { data, isLoading, isError, refetch } = useInsight(restaurantId, date);
 
   if (isLoading) {
-    return <p className="text-sm text-slate-400">Loading waste risk…</p>;
+    return <p className="text-sm text-slate-400">{t("loadingRisk")}</p>;
   }
   if (isError) {
-    return <p className="text-sm text-red-400">{(error as Error).message}</p>;
+    return <div role="alert"><p className="text-sm text-red-400">{t("loadError")}</p><button type="button" onClick={() => void refetch()} className="mt-2 min-h-11 rounded-md border border-slate-700 px-4 text-sm">{t("retry")}</button></div>;
   }
   if (!data || data.wasteRisk.length === 0) {
     return (
       <p className="text-sm text-slate-400">
-        No waste-risk data for this restaurant and date yet.
+        {t("emptyRisk")}
       </p>
     );
   }
@@ -25,10 +28,10 @@ export function WasteRiskPanel() {
   return (
     <div>
       <h2 className="mb-1 text-base font-semibold">
-        Waste Risk — {data.restaurant.name} · {data.date}
+        {t("wasteRisk")} — <bdi>{data.restaurant.name}</bdi> · {formatDate(data.date)}
       </h2>
       <p className="mb-4 text-sm text-slate-400">
-        {highRiskCount} of {data.wasteRisk.length} items flagged HIGH risk today.
+        {t("riskSummary", { count: highRiskCount, total: data.wasteRisk.length })}
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {data.wasteRisk.map((w) => (
@@ -42,10 +45,10 @@ export function WasteRiskPanel() {
                     : "bg-verde-500/15 text-verde-400"
                 }`}
               >
-                {w.riskScore}
+                {t(w.riskScore === "HIGH" ? "high" : "low")}
               </span>
             </div>
-            <p className="text-xs text-slate-400">Predicted: {w.predictedQuantity} units</p>
+            <p className="text-xs text-slate-400">{t("units", { count: w.predictedQuantity })}</p>
           </div>
         ))}
       </div>

@@ -56,3 +56,18 @@ __blobstorage__
 __queuestorage__
 __azurite_db*__.json
 .rocketride/
+
+# Legacy mobile web assets
+dist-native/
+
+# Native build outputs and local device configuration
+**/.gradle/
+**/.kotlin/
+**/.cxx/
+**/build/
+**/.build/
+**/local.properties
+**/xcuserdata/
+*.xcuserstate
+*.keystore
+!apps/android/android/app/debug.keystore

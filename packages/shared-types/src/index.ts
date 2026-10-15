@@ -34,6 +34,7 @@ export interface WasteRiskRecord {
 export interface ExplainRequest {
   restaurantId: string;
   date: string;
+  locale?: SupportedLocale;
 }
 
 export interface ExplainResponse {
@@ -54,6 +55,20 @@ export interface ExplainChatRequest {
   restaurantId: string;
   date: string;
   messages: ChatMessage[];
+  locale?: SupportedLocale;
+}
+
+export const SUPPORTED_LOCALES = ["en", "kn", "hi", "fr", "es"] as const;
+export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
+export const LANGUAGE_NAMES: Record<SupportedLocale, string> = {
+  en: "English", kn: "Kannada", hi: "Hindi", fr: "French", es: "Spanish",
+};
+
+/** Accept regional browser locales, with a safe English fallback. */
+export function resolveLocale(value: unknown): SupportedLocale {
+  if (typeof value !== "string") return "en";
+  const base = value.toLowerCase().split(/[-_]/)[0];
+  return SUPPORTED_LOCALES.find((locale) => locale === base) ?? "en";
 }
 
 export interface ExplainChatResponse {

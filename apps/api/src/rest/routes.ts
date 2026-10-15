@@ -55,17 +55,17 @@ export function createRestRouter(repository: Repository, explainService: Explain
   });
 
   router.post("/explain", async (req, res) => {
-    const { restaurantId, date } = req.body ?? {};
+    const { restaurantId, date, locale } = req.body ?? {};
     if (!restaurantId || !date) {
       res.status(400).json({ error: "restaurantId and date are required" });
       return;
     }
-    const result = await explainService.explain(restaurantId, date);
+    const result = await explainService.explain(restaurantId, date, locale);
     res.json({ restaurantId, date, ...result });
   });
 
   router.post("/explain/chat", async (req, res) => {
-    const { restaurantId, date, messages } = req.body ?? {};
+    const { restaurantId, date, messages, locale } = req.body ?? {};
     if (!restaurantId || !date || !Array.isArray(messages)) {
       res.status(400).json({ error: "restaurantId, date, and messages[] are required" });
       return;
@@ -74,6 +74,7 @@ export function createRestRouter(repository: Repository, explainService: Explain
       restaurantId,
       date,
       messages as ChatMessage[],
+      locale,
     );
     res.json(result);
   });

@@ -2,7 +2,7 @@ import type { ChatMessage } from "@verdeai/shared-types";
 import { create } from "zustand";
 
 interface ChatState {
-  /** Chat history keyed by `${restaurantId}:${date}` so each context keeps its own thread. */
+  /** Chat history keyed by `${restaurantId}:${date}:${locale}` so each context keeps its own thread. */
   messagesByKey: Record<string, ChatMessage[]>;
   isSending: boolean;
   getMessages: (key: string) => ChatMessage[];
@@ -11,10 +11,12 @@ interface ChatState {
   setSending: (sending: boolean) => void;
 }
 
+const EMPTY_MESSAGES: ChatMessage[] = [];
+
 export const useChatStore = create<ChatState>((set, get) => ({
   messagesByKey: {},
   isSending: false,
-  getMessages: (key) => get().messagesByKey[key] ?? [],
+  getMessages: (key) => get().messagesByKey[key] ?? EMPTY_MESSAGES,
   addMessage: (key, message) =>
     set((state) => ({
       messagesByKey: {

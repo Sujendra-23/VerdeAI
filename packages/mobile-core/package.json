@@ -1,0 +1,10 @@
+{
+  "name": "@verdeai/mobile-core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/client.ts", "./messages": "./src/messages.ts", "./config": "./config.json" },
+  "dependencies": { "@verdeai/shared-types": "*" },
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "devDependencies": { "vitest": "^3.0.0", "typescript": "^5.7.3" }
+}

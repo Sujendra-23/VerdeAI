@@ -79,7 +79,7 @@ const typeDefs = /* GraphQL */ `
     restaurants: [Restaurant!]!
     forecasts(restaurantId: String!, date: String!): [ForecastRecord!]!
     wasteRisk(restaurantId: String!, date: String!): [WasteRiskRecord!]!
-    insight(restaurantId: String!, date: String!): RestaurantInsight!
+    insight(restaurantId: String!, date: String!, locale: String = "en"): RestaurantInsight!
   }
 
   type Mutation {
@@ -87,6 +87,7 @@ const typeDefs = /* GraphQL */ `
       restaurantId: String!
       date: String!
       messages: [ChatMessageInput!]!
+      locale: String = "en"
     ): ExplainChatResult!
   }
 `;
@@ -106,14 +107,14 @@ export const schema = createSchema<GraphQLContext>({
         ctx.repository.getWasteRisk(args.restaurantId, args.date),
       insight: async (
         _parent,
-        args: { restaurantId: string; date: string },
+        args: { restaurantId: string; date: string; locale?: string },
         ctx,
       ) => {
         const [restaurants, forecasts, wasteRisk, explainResult] = await Promise.all([
           ctx.repository.listRestaurants(),
           ctx.repository.getForecasts(args.restaurantId, args.date),
           ctx.repository.getWasteRisk(args.restaurantId, args.date),
-          ctx.explainService.explain(args.restaurantId, args.date),
+          ctx.explainService.explain(args.restaurantId, args.date, args.locale),
         ]);
         const restaurant = restaurants.find((r) => r.restaurantId === args.restaurantId) ?? {
           restaurantId: args.restaurantId,
@@ -132,13 +133,14 @@ export const schema = createSchema<GraphQLContext>({
     Mutation: {
       explainChat: async (
         _parent,
-        args: { restaurantId: string; date: string; messages: ChatMessage[] },
+        args: { restaurantId: string; date: string; messages: ChatMessage[]; locale?: string },
         ctx,
       ) => {
         const result = await ctx.explainService.chat(
           args.restaurantId,
           args.date,
           args.messages,
+          args.locale,
         );
         return {
           reply: result.reply,

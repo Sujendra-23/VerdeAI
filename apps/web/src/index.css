@@ -17,4 +17,65 @@ body,
 
 body {
   @apply bg-slate-950 text-slate-100 antialiased;
+  margin: 0;
+  color-scheme: dark;
+}
+
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+.dashboard-main {
+  overflow-wrap: anywhere;
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+}
+
+.dashboard-nav {
+  position: fixed;
+  z-index: 10;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #1e293b;
+  background: #020617;
+  padding: 0.5rem max(0.5rem, env(safe-area-inset-right)) max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+}
+
+:focus-visible {
+  outline: 2px solid #4ade80;
+  outline-offset: 3px;
+}
+
+::selection { background: #15803d; color: white; }
+input { caret-color: #4ade80; }
+* { scrollbar-color: #475569 #020617; }
+
+@media (max-width: 767px) {
+  .forecast-table thead { display: none; }
+  .forecast-table, .forecast-table tbody, .forecast-table tr { display: block; }
+  .forecast-table tr { padding: 0.5rem 0; }
+  .forecast-table td { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+  .forecast-table td::before { content: attr(data-label); color: #94a3b8; }
+  .forecast-table td:first-child { font-weight: 600; }
+  .forecast-table td:first-child::before { display: none; }
+}
+
+@media (min-width: 768px) {
+  .dashboard-nav { position: static; border: 0; padding: 0; }
+  .dashboard-main { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}
+
+@media (min-width: 768px) {
+  .dashboard-sidebar { border-inline-end: 1px solid #1e293b; }
+}
+
+@media (max-width: 767px) {
+  .dashboard-nav button { min-width: 0; overflow-wrap: anywhere; }
+  .app-header > div { min-width: 0; }
 }

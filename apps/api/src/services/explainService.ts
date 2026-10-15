@@ -1,4 +1,6 @@
 import axios from "axios";
+import { LANGUAGE_NAMES, resolveLocale, type SupportedLocale } from "@verdeai/shared-types";
+import { localizedReply } from "./localizedReply.js";
 import type {
   ChatMessage,
   ExplainChatResponse,
@@ -30,6 +32,7 @@ function buildSystemPrompt(
   date: string,
   forecasts: ForecastRecord[],
   wasteRisk: WasteRiskRecord[],
+  locale: SupportedLocale,
 ): string {
   return `You are VerdeAI, an AI assistant for restaurant food waste reduction.
 
@@ -39,6 +42,7 @@ Date: ${date}
 Forecast: ${JSON.stringify(forecasts)}
 Waste Risk: ${JSON.stringify(wasteRisk)}
 
+Reply in ${LANGUAGE_NAMES[locale]} (${locale}), including when the question or menu names are in another language. Keep menu item names exactly as supplied.
 Answer the manager's questions clearly and concisely, grounded only in the data above.
 When first asked for an explanation, summarize the highest-risk items and a concrete
 recommendation (e.g. reduce prep volume by a percentage). Keep replies under 120 words.`;
@@ -49,7 +53,9 @@ function templatedReply(
   forecasts: ForecastRecord[],
   wasteRisk: WasteRiskRecord[],
   question: string | undefined,
+  locale: SupportedLocale,
 ): string {
+  if (locale !== "en") return localizedReply(forecasts, wasteRisk, question, locale);
   if (forecasts.length === 0) {
     return "No forecast data is available for that restaurant and date yet — the nightly VerdeAI_GenerateForecast job hasn't produced a record for this combination.";
   }
@@ -102,8 +108,9 @@ export class ExplainService {
   async explain(
     restaurantId: string,
     date: string,
+    locale: string = "en",
   ): Promise<{ explanation: string; source: "azure-openai" | "template" }> {
-    const reply = await this.chat(restaurantId, date, []);
+    const reply = await this.chat(restaurantId, date, [], locale);
     return { explanation: reply.reply.content, source: reply.source };
   }
 
@@ -111,17 +118,19 @@ export class ExplainService {
     restaurantId: string,
     date: string,
     messages: ChatMessage[],
+    requestedLocale: string = "en",
   ): Promise<ExplainChatResponse> {
+    const locale = resolveLocale(requestedLocale);
     const { forecasts, wasteRisk } = await this.loadContext(restaurantId, date);
     const config = readAzureOpenAiConfig();
     const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
 
     if (!config) {
-      const content = templatedReply(forecasts, wasteRisk, lastUserMessage?.content);
+      const content = templatedReply(forecasts, wasteRisk, lastUserMessage?.content, locale);
       return { reply: { role: "assistant", content }, source: "template" };
     }
 
-    const systemPrompt = buildSystemPrompt(restaurantId, date, forecasts, wasteRisk);
+    const systemPrompt = buildSystemPrompt(restaurantId, date, forecasts, wasteRisk, locale);
     const conversation = [
       { role: "system", content: systemPrompt },
       ...messages,
@@ -136,7 +145,7 @@ export class ExplainService {
     try {
       const response = await axios.post(
         `${config.endpoint}openai/deployments/${config.deployment}/chat/completions?api-version=2024-02-15-preview`,
-        { messages: conversation, max_tokens: 300 },
+        { messages: conversation, max_tokens: locale === "en" ? 300 : 1000 },
         {
           headers: {
             "api-key": config.apiKey,
@@ -149,7 +158,7 @@ export class ExplainService {
     } catch (err) {
       // Azure OpenAI unreachable/misconfigured at runtime — degrade to the
       // templated answer rather than failing the whole panel.
-      const content = templatedReply(forecasts, wasteRisk, lastUserMessage?.content);
+      const content = templatedReply(forecasts, wasteRisk, lastUserMessage?.content, locale);
       return { reply: { role: "assistant", content }, source: "template" };
     }
   }

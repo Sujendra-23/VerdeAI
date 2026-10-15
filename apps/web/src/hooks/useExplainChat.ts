@@ -3,6 +3,8 @@ import { useMutation } from "@tanstack/react-query";
 import { postExplainChat } from "../api/client";
 import { useChatStore } from "../store/chatStore";
 
+import { useLanguageStore } from "../i18n";
+
 /**
  * Sends one chat turn to POST /api/explain/chat, appending both the user's
  * question and the assistant's reply to the shared chatStore keyed by
@@ -11,18 +13,20 @@ import { useChatStore } from "../store/chatStore";
  * build the request body is always current when mutationFn actually runs.
  */
 export function useExplainChat(restaurantId: string, date: string) {
-  const key = `${restaurantId}:${date}`;
+  const locale = useLanguageStore((s) => s.locale);
+  const key = `${restaurantId}:${date}:${locale}`;
   const addMessage = useChatStore((s) => s.addMessage);
   const setSending = useChatStore((s) => s.setSending);
   const messages = useChatStore((s) => s.getMessages(key));
 
   const mutation = useMutation({
+    mutationKey: ["explain", key],
     mutationFn: async (question: string) => {
       const userMessage: ChatMessage = { role: "user", content: question };
       addMessage(key, userMessage);
       setSending(true);
       try {
-        const result = await postExplainChat(restaurantId, date, [...messages, userMessage]);
+        const result = await postExplainChat(restaurantId, date, [...messages, userMessage], locale);
         addMessage(key, result.reply);
         return result;
       } finally {
@@ -31,5 +35,5 @@ export function useExplainChat(restaurantId: string, date: string) {
     },
   });
 
-  return { messages, sendMessage: mutation.mutate, isSending: mutation.isPending };
+  return { messages, sendMessage: mutation.mutate, isSending: mutation.isPending, error: mutation.error };
 }

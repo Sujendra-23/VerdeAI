@@ -95,3 +95,20 @@ describe("POST /graphql", () => {
     expect(typeof res.body.data.insight.explanation).toBe("string");
   });
 });
+
+describe('language propagation through REST and GraphQL', () => {
+  it('localizes REST explanations and chat replies', async () => {
+    const explanation = await request(app).post('/api/explain').send({ restaurantId: 'missing', date: sample.date, locale: 'kn' });
+    expect(explanation.body.explanation).toContain('ಮುನ್ಸೂಚನೆ');
+    const chat = await request(app).post('/api/explain/chat').send({ restaurantId: sample.restaurantId, date: sample.date, locale: 'hi', messages: [{ role: 'user', content: sample.item }] });
+    expect(chat.body.reply.content).toContain('अनुमानित');
+  });
+  it('localizes GraphQL insight and chat while retaining optional English defaults', async () => {
+    const insight = await request(app).post('/graphql').send({ query: '{ insight(restaurantId: "missing", date: "2026-02-05", locale: "es") { explanation } }' });
+    expect(insight.body.errors).toBeUndefined();
+    expect(insight.body.data.insight.explanation).toContain('previsiones');
+    const chat = await request(app).post('/graphql').send({ query: 'mutation { explainChat(restaurantId: "missing", date: "2026-02-05", locale: "fr", messages: []) { reply { content } } }' });
+    expect(chat.body.errors).toBeUndefined();
+    expect(chat.body.data.explainChat.reply.content).toContain('prévision');
+  });
+});

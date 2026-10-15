@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AppStatus } from "./components/AppStatus";
 import { ExplainChatPanel } from "./components/ExplainChatPanel";
 import { ForecastPanel } from "./components/ForecastPanel";
 import { Sidebar } from "./components/Sidebar";
@@ -6,9 +7,13 @@ import { WasteRiskPanel } from "./components/WasteRiskPanel";
 import { useHealth } from "./hooks/useHealth";
 import { useUiStore } from "./store/uiStore";
 
+import { useI18n } from "./i18n";
+import { LanguageSelector } from "./components/LanguageSelector";
+
 const queryClient = new QueryClient();
 
 function DataSourceBadge() {
+  const { t } = useI18n();
   const { data } = useHealth();
   if (!data) return null;
 
@@ -20,22 +25,25 @@ function DataSourceBadge() {
       }`}
       title={
         isMock
-          ? "No Cosmos DB configured — serving seeded demo data"
-          : "Connected to live Cosmos DB"
+          ? t("demoHint")
+          : t("liveHint")
       }
     >
-      {isMock ? "● Demo data" : "● Live Cosmos DB"}
+      {isMock ? t("demo") : t("live")}
     </span>
   );
 }
 
 function DashboardBody() {
+  const { locale } = useI18n();
   const activeTab = useUiStore((s) => s.activeTab);
+  const restaurantId = useUiStore((s) => s.restaurantId);
+  const date = useUiStore((s) => s.date);
   return (
-    <main className="flex-1 overflow-y-auto p-6">
+    <main className="dashboard-main min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
       {activeTab === "forecast" && <ForecastPanel />}
       {activeTab === "waste-risk" && <WasteRiskPanel />}
-      {activeTab === "explain" && <ExplainChatPanel />}
+      {activeTab === "explain" && <ExplainChatPanel key={`${restaurantId}:${date}:${locale}`} />}
     </main>
   );
 }
@@ -43,17 +51,21 @@ function DashboardBody() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen flex-col bg-slate-950 text-slate-100">
-        <header className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+      <div className="app-shell flex flex-col bg-slate-950 text-slate-100">
+        <header className="app-header flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-2">
             <span className="text-xl" aria-hidden="true">
               🌱
             </span>
-            <h1 className="text-lg font-semibold">VerdeAI Dashboard</h1>
+            <h1 className="text-lg font-semibold">VerdeAI</h1>
           </div>
-          <DataSourceBadge />
+          <div className="flex flex-wrap items-center gap-3">
+            <DataSourceBadge />
+            <LanguageSelector />
+          </div>
         </header>
-        <div className="flex flex-1 overflow-hidden">
+        <AppStatus />
+        <div className="dashboard-layout flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
           <Sidebar />
           <DashboardBody />
         </div>

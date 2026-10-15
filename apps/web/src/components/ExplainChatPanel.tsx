@@ -4,14 +4,17 @@ import { useExplainChat } from "../hooks/useExplainChat";
 import { useChatStore } from "../store/chatStore";
 import { useUiStore } from "../store/uiStore";
 
+import { useI18n } from "../i18n";
+
 export function ExplainChatPanel() {
+  const { locale, t } = useI18n();
   const restaurantId = useUiStore((s) => s.restaurantId);
   const date = useUiStore((s) => s.date);
-  const chatKey = `${restaurantId}:${date}`;
+  const chatKey = `${restaurantId}:${date}:${locale}`;
 
-  const { data: insight, isLoading: insightLoading } = useInsight(restaurantId, date);
+  const { data: insight, isLoading: insightLoading, isError: insightError, refetch } = useInsight(restaurantId, date);
   const addMessage = useChatStore((s) => s.addMessage);
-  const { messages, sendMessage, isSending } = useExplainChat(restaurantId, date);
+  const { messages, sendMessage, isSending, error } = useExplainChat(restaurantId, date);
 
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -44,22 +47,24 @@ export function ExplainChatPanel() {
   }
 
   return (
-    <div className="flex h-full max-h-[calc(100vh-8rem)] flex-col">
-      <h2 className="mb-4 text-base font-semibold">AI Explain</h2>
+    <div className="flex h-full min-h-0 flex-col md:min-h-64">
+      <h2 className="mb-4 text-base font-semibold">{t("explain")}</h2>
 
       <div
         ref={scrollRef}
-        className="mb-4 flex-1 space-y-3 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/50 p-4"
+        className="mb-4 min-h-0 flex-1 space-y-3 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/50 p-4"
       >
         {insightLoading && messages.length === 0 && (
-          <p className="text-sm text-slate-400">Loading today&apos;s insight…</p>
+          <p className="text-sm text-slate-400">{t("loadingInsight")}</p>
         )}
+
+        {insightError && messages.length === 0 && <div role="alert"><p className="text-sm text-red-400">{t("loadError")}</p><button type="button" onClick={() => void refetch()} className="mt-2 min-h-11 rounded-md border border-slate-700 px-4 text-sm">{t("retry")}</button></div>}
 
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
-              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                m.role === "user" ? "bg-verde-600 text-white" : "bg-slate-800 text-slate-100"
+              className={`max-w-[90%] break-words rounded-lg px-3 py-2 text-sm md:max-w-[80%] ${
+                m.role === "user" ? "bg-verde-700 text-white" : "bg-slate-800 text-slate-100"
               }`}
             >
               {m.content}
@@ -70,26 +75,28 @@ export function ExplainChatPanel() {
         {isSending && (
           <div className="flex justify-start">
             <div className="max-w-[80%] rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-400">
-              VerdeAI is thinking…
+              {t("thinking")}
             </div>
           </div>
         )}
       </div>
 
+      {error && <p role="alert" className="mb-2 text-sm text-red-400">{t("sendError")}</p>}
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
+          aria-label={t("ask")}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Ask about a menu item, e.g. “What about the Miso Salmon Plate?”"
-          className="flex-1 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm focus:border-verde-500 focus:outline-none"
+          placeholder={t("placeholder")}
+          className="min-h-11 min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-base focus:border-verde-500 focus:outline-none"
           disabled={isSending}
         />
         <button
           type="submit"
           disabled={isSending || !draft.trim()}
-          className="rounded-md bg-verde-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-verde-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="min-h-11 rounded-md bg-verde-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-verde-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Send
+          {t("send")}
         </button>
       </form>
     </div>
