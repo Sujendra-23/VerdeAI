@@ -1,13 +1,17 @@
 import axios from "axios";
-import { LANGUAGE_NAMES, resolveLocale, type SupportedLocale } from "@verdeai/shared-types";
+import { resolveLocale, type SupportedLocale } from "@verdeai/shared-types";
 import { localizedReply } from "./localizedReply.js";
 import type {
   ChatMessage,
   ExplainChatResponse,
   ForecastRecord,
+  LanguageCode,
+  LanguagePreference,
   WasteRiskRecord,
 } from "@verdeai/shared-types";
 import type { Repository } from "../data/repository.js";
+import { languageName, resolveLanguage } from "./language.js";
+import { CATALOGS } from "./replyTemplates.js";
 
 interface AzureOpenAiConfig {
   endpoint: string;
@@ -32,8 +36,9 @@ function buildSystemPrompt(
   date: string,
   forecasts: ForecastRecord[],
   wasteRisk: WasteRiskRecord[],
-  locale: SupportedLocale,
+  language: LanguageCode | SupportedLocale,
 ): string {
+  const name = language === "kn" ? "Kannada" : languageName(language);
   return `You are VerdeAI, an AI assistant for restaurant food waste reduction.
 
 Restaurant: ${restaurantId}
@@ -42,10 +47,12 @@ Date: ${date}
 Forecast: ${JSON.stringify(forecasts)}
 Waste Risk: ${JSON.stringify(wasteRisk)}
 
-Reply in ${LANGUAGE_NAMES[locale]} (${locale}), including when the question or menu names are in another language. Keep menu item names exactly as supplied.
 Answer the manager's questions clearly and concisely, grounded only in the data above.
 When first asked for an explanation, summarize the highest-risk items and a concrete
-recommendation (e.g. reduce prep volume by a percentage). Keep replies under 120 words.`;
+recommendation (e.g. reduce prep volume by a percentage). Keep replies under 120 words.
+
+Reply in ${name} (language code "${language}"), whatever language the data or earlier
+messages are in. Reply in ${name} (${language}). Keep menu item names exactly as they appear in the data.`;
 }
 
 /** Used when Azure OpenAI isn't configured, so the dashboard is fully demoable offline. */
@@ -53,11 +60,11 @@ function templatedReply(
   forecasts: ForecastRecord[],
   wasteRisk: WasteRiskRecord[],
   question: string | undefined,
-  locale: SupportedLocale,
+  language: LanguageCode,
 ): string {
-  if (locale !== "en") return localizedReply(forecasts, wasteRisk, question, locale);
+  const t = CATALOGS[language];
   if (forecasts.length === 0) {
-    return "No forecast data is available for that restaurant and date yet — the nightly VerdeAI_GenerateForecast job hasn't produced a record for this combination.";
+    return t.noData;
   }
 
   const highRisk = wasteRisk.filter((w) => w.riskScore === "HIGH");
@@ -68,13 +75,22 @@ function templatedReply(
     );
     if (match) {
       const risk = wasteRisk.find((w) => w.item === match.item);
-      return `${match.item}: forecast is ${match.predictedQuantity} units vs a historical average of ${Math.round(match.historicalAverage)}. Waste risk is ${risk?.riskScore ?? "LOW"}.${risk?.riskScore === "HIGH" ? " Consider trimming prep by roughly 15-20% to stay ahead of the surplus." : " Current prep levels look appropriate."}`;
+      return t.itemReply({
+        item: match.item,
+        predicted: match.predictedQuantity,
+        average: Math.round(match.historicalAverage),
+        risk: risk?.riskScore ?? "LOW",
+      });
     }
-    return `I don't see "${question}" by name in today's forecast. The tracked items are: ${forecasts.map((f) => f.item).join(", ")}.`;
+    // No item named: a question about risk/waste/prep gets the overall summary.
+    const wantsSummary = t.summaryIntent.test(question) || CATALOGS.en.summaryIntent.test(question);
+    if (!wantsSummary) {
+      return t.notFound(question, forecasts.map((f) => f.item));
+    }
   }
 
   if (highRisk.length === 0) {
-    return `Demand looks steady across all ${forecasts.length} tracked items today — no items are flagged HIGH risk. No prep changes recommended.`;
+    return t.steady(forecasts.length);
   }
 
   const lines = highRisk
@@ -87,11 +103,11 @@ function templatedReply(
               100,
           )
         : null;
-      return `${w.item} (forecast ${w.predictedQuantity}${overBy !== null ? `, ~${overBy}% above average` : ""})`;
+      return t.highRiskLine({ item: w.item, predicted: w.predictedQuantity, overBy });
     })
-    .join(", ");
+    .join(t.sep);
 
-  return `${highRisk.length} of ${forecasts.length} items are trending toward overproduction today: ${lines}. Reduce prep volume on these by ~15% and monitor sell-through at midday to avoid discarding surplus.`;
+  return t.highRiskSummary({ high: highRisk.length, total: forecasts.length, lines });
 }
 
 export class ExplainService {
@@ -108,29 +124,37 @@ export class ExplainService {
   async explain(
     restaurantId: string,
     date: string,
-    locale: string = "en",
-  ): Promise<{ explanation: string; source: "azure-openai" | "template" }> {
-    const reply = await this.chat(restaurantId, date, [], locale);
-    return { explanation: reply.reply.content, source: reply.source };
+    language: string = "auto",
+    locale?: string,
+  ): Promise<{ explanation: string; source: "azure-openai" | "template"; language?: LanguageCode | SupportedLocale }> {
+    const reply = await this.chat(restaurantId, date, [], language, locale);
+    return { explanation: reply.reply.content, source: reply.source, language: reply.language };
   }
 
   async chat(
     restaurantId: string,
     date: string,
     messages: ChatMessage[],
-    requestedLocale: string = "en",
+    languagePreference: string = "auto",
+    requestedLocale?: string,
   ): Promise<ExplainChatResponse> {
-    const locale = resolveLocale(requestedLocale);
     const { forecasts, wasteRisk } = await this.loadContext(restaurantId, date);
+    const locale = requestedLocale !== undefined ? resolveLocale(requestedLocale) : undefined;
+    const known = languagePreference === "auto" || ["en", "es", "fr", "de", "pt", "it", "hi", "zh", "ja"].includes(languagePreference);
+    const language = locale ?? (known ? resolveLanguage(languagePreference as LanguagePreference, messages) : resolveLocale(languagePreference));
     const config = readAzureOpenAiConfig();
     const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
 
+    const replyTemplate = () => (locale !== undefined && locale !== "en") || language === "kn"
+      ? localizedReply(forecasts, wasteRisk, lastUserMessage?.content, (locale ?? language) as Exclude<SupportedLocale, "en">)
+      : templatedReply(forecasts, wasteRisk, lastUserMessage?.content, language);
+
     if (!config) {
-      const content = templatedReply(forecasts, wasteRisk, lastUserMessage?.content, locale);
-      return { reply: { role: "assistant", content }, source: "template" };
+      const content = replyTemplate();
+      return { reply: { role: "assistant", content }, source: "template", language };
     }
 
-    const systemPrompt = buildSystemPrompt(restaurantId, date, forecasts, wasteRisk, locale);
+    const systemPrompt = buildSystemPrompt(restaurantId, date, forecasts, wasteRisk, language);
     const conversation = [
       { role: "system", content: systemPrompt },
       ...messages,
@@ -145,7 +169,7 @@ export class ExplainService {
     try {
       const response = await axios.post(
         `${config.endpoint}openai/deployments/${config.deployment}/chat/completions?api-version=2024-02-15-preview`,
-        { messages: conversation, max_tokens: locale === "en" ? 300 : 1000 },
+        { messages: conversation, max_tokens: language === "en" ? 300 : 1000 },
         {
           headers: {
             "api-key": config.apiKey,
@@ -154,12 +178,12 @@ export class ExplainService {
         },
       );
       const content: string = response.data.choices[0].message.content;
-      return { reply: { role: "assistant", content }, source: "azure-openai" };
+      return { reply: { role: "assistant", content }, source: "azure-openai", language };
     } catch (err) {
       // Azure OpenAI unreachable/misconfigured at runtime — degrade to the
       // templated answer rather than failing the whole panel.
-      const content = templatedReply(forecasts, wasteRisk, lastUserMessage?.content, locale);
-      return { reply: { role: "assistant", content }, source: "template" };
+      const content = replyTemplate();
+      return { reply: { role: "assistant", content }, source: "template", language };
     }
   }
 }

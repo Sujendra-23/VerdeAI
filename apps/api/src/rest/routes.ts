@@ -1,5 +1,5 @@
 import { Router } from "express";
-import type { ChatMessage } from "@verdeai/shared-types";
+import { isLanguagePreference, type ChatMessage } from "@verdeai/shared-types";
 import type { Repository } from "../data/repository.js";
 import type { ExplainService } from "../services/explainService.js";
 
@@ -55,26 +55,29 @@ export function createRestRouter(repository: Repository, explainService: Explain
   });
 
   router.post("/explain", async (req, res) => {
-    const { restaurantId, date, locale } = req.body ?? {};
+    const { restaurantId, date, locale, language } = req.body ?? {};
     if (!restaurantId || !date) {
       res.status(400).json({ error: "restaurantId and date are required" });
       return;
     }
-    const result = await explainService.explain(restaurantId, date, locale);
+    if (language !== undefined && !isLanguagePreference(language)) { res.status(400).json({ error: "language must be auto or a supported language code" }); return; }
+    const result = await explainService.explain(restaurantId, date, language, language === undefined ? locale : undefined);
     res.json({ restaurantId, date, ...result });
   });
 
   router.post("/explain/chat", async (req, res) => {
-    const { restaurantId, date, messages, locale } = req.body ?? {};
+    const { restaurantId, date, messages, locale, language } = req.body ?? {};
     if (!restaurantId || !date || !Array.isArray(messages)) {
       res.status(400).json({ error: "restaurantId, date, and messages[] are required" });
       return;
     }
+    if (language !== undefined && !isLanguagePreference(language)) { res.status(400).json({ error: "language must be auto or a supported language code" }); return; }
     const result = await explainService.chat(
       restaurantId,
       date,
       messages as ChatMessage[],
-      locale,
+      language,
+      language === undefined ? locale : undefined,
     );
     res.json(result);
   });

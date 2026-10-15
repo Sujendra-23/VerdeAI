@@ -53,13 +53,13 @@ describe('localized explanations', () => {
     ['fr', 'prévision', 'prévision'],
     ['es', 'previsiones', 'previsión'],
   ])('localizes empty states and item replies in %s', async (locale, empty, item) => {
-    const noData = await service.explain('missing', '1999-01-01', locale);
+    const noData = await service.explain('missing', '1999-01-01', 'auto', locale);
     expect(noData.explanation).toContain(empty);
-    const reply = await service.chat(sample.restaurantId, sample.date, [{ role: 'user', content: sample.item }], locale);
+    const reply = await service.chat(sample.restaurantId, sample.date, [{ role: 'user', content: sample.item }], 'auto', locale);
     expect(reply.reply.content).toContain(item);
     expect(reply.reply.content).toContain(sample.item);
     expect(reply.reply.content).not.toContain('forecast is');
-    const summary = await service.explain(sample.restaurantId, sample.date, locale);
+    const summary = await service.explain(sample.restaurantId, sample.date, 'auto', locale);
     expect(summary.explanation).not.toContain('items are');
     expect(summary.explanation).not.toContain('Demand looks steady');
   });
@@ -81,7 +81,7 @@ describe('Azure language selection', () => {
     const post = vi.spyOn(axios, 'post').mockResolvedValue({ data: { choices: [{ message: { content: 'ಕನ್ನಡ ಉತ್ತರ' } }] } });
     const service = new ExplainService(createRepository({} as NodeJS.ProcessEnv));
     const sample = MOCK_FORECASTS[0]!;
-    const result = await service.explain(sample.restaurantId, sample.date, 'kn-IN');
+    const result = await service.explain(sample.restaurantId, sample.date, 'auto', 'kn-IN');
     expect(result.explanation).toBe('ಕನ್ನಡ ಉತ್ತರ');
     expect(result.source).toBe('azure-openai');
     expect(post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
@@ -91,7 +91,7 @@ describe('Azure language selection', () => {
   });
   it('keeps the fallback localized if Azure fails', async () => {
     vi.spyOn(axios, 'post').mockRejectedValue(new Error('offline'));
-    const result = await new ExplainService(createRepository({} as NodeJS.ProcessEnv)).explain('missing', '1999-01-01', 'kn');
+    const result = await new ExplainService(createRepository({} as NodeJS.ProcessEnv)).explain('missing', '1999-01-01', 'auto', 'kn');
     expect(result.source).toBe('template');
     expect(result.explanation).toContain('ಮುನ್ಸೂಚನೆ');
   });

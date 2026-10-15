@@ -1,3 +1,5 @@
+import { SUPPORTED_LANGUAGES, isLanguagePreference } from "@verdeai/shared-types";
+import { panelStrings } from "../chatI18n";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useInsight } from "../hooks/useInsight";
 import { useExplainChat } from "../hooks/useExplainChat";
@@ -14,8 +16,13 @@ export function ExplainChatPanel() {
 
   const { data: insight, isLoading: insightLoading, isError: insightError, refetch } = useInsight(restaurantId, date);
   const addMessage = useChatStore((s) => s.addMessage);
-  const { messages, sendMessage, isSending, error } = useExplainChat(restaurantId, date);
+  const { messages, sendMessage, requestExplanation, isSending, error } = useExplainChat(restaurantId, date);
 
+  const language = useUiStore((s) => s.language);
+  const setLanguage = useUiStore((s) => s.setLanguage);
+  const panel = panelStrings(language);
+  const chatText = { explain: panel.title, loadingInsight: panel.loading, thinking: panel.thinking, placeholder: panel.placeholder, send: panel.send };
+  const ui = (key: keyof typeof chatText) => language === "auto" && locale !== "en" ? t(key) : chatText[key];
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   // Tracks which chatKeys have already been seeded, so the seed message is
@@ -29,7 +36,8 @@ export function ExplainChatPanel() {
   useEffect(() => {
     if (insight && messages.length === 0 && !seededKeysRef.current.has(chatKey)) {
       seededKeysRef.current.add(chatKey);
-      addMessage(chatKey, { role: "assistant", content: insight.explanation });
+      if (language === "auto" || language === "en") addMessage(chatKey, { role: "assistant", content: insight.explanation });
+      else requestExplanation(language);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [insight, chatKey]);
@@ -37,6 +45,14 @@ export function ExplainChatPanel() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length]);
+
+  const previousLanguageRef = useRef(language);
+  useEffect(() => {
+    if (previousLanguageRef.current === language) return;
+    previousLanguageRef.current = language;
+    if (language !== "auto" && messages.length > 0) requestExplanation(language);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -48,14 +64,23 @@ export function ExplainChatPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col md:min-h-64">
-      <h2 className="mb-4 text-base font-semibold">{t("explain")}</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">{ui("explain")}</h2>
+        <label className="flex min-h-11 flex-wrap items-center gap-2 text-sm text-slate-300">
+          {panel.languageLabel}
+          <select className="min-h-11 rounded-md border border-slate-700 bg-slate-900 px-2 text-slate-100" value={language} onChange={(event) => { if (isLanguagePreference(event.target.value)) setLanguage(event.target.value); }}>
+            <option value="auto">{panel.auto}</option>
+            {SUPPORTED_LANGUAGES.map(value => <option key={value.code} value={value.code}>{value.nativeName}</option>)}
+          </select>
+        </label>
+      </div>
 
       <div
         ref={scrollRef}
         className="mb-4 min-h-0 flex-1 space-y-3 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/50 p-4"
       >
         {insightLoading && messages.length === 0 && (
-          <p className="text-sm text-slate-400">{t("loadingInsight")}</p>
+          <p className="text-sm text-slate-400">{ui("loadingInsight")}</p>
         )}
 
         {insightError && messages.length === 0 && <div role="alert"><p className="text-sm text-red-400">{t("loadError")}</p><button type="button" onClick={() => void refetch()} className="mt-2 min-h-11 rounded-md border border-slate-700 px-4 text-sm">{t("retry")}</button></div>}
@@ -75,7 +100,7 @@ export function ExplainChatPanel() {
         {isSending && (
           <div className="flex justify-start">
             <div className="max-w-[80%] rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-400">
-              {t("thinking")}
+              {ui("thinking")}
             </div>
           </div>
         )}
@@ -87,7 +112,7 @@ export function ExplainChatPanel() {
           aria-label={t("ask")}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={t("placeholder")}
+          placeholder={ui("placeholder")}
           className="min-h-11 min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-base focus:border-verde-500 focus:outline-none"
           disabled={isSending}
         />
@@ -96,7 +121,7 @@ export function ExplainChatPanel() {
           disabled={isSending || !draft.trim()}
           className="min-h-11 rounded-md bg-verde-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-verde-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {t("send")}
+          {ui("send")}
         </button>
       </form>
     </div>

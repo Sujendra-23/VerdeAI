@@ -1,5 +1,6 @@
 import type {
   ChatMessage,
+  LanguagePreference,
   ExplainChatResponse,
   Restaurant,
   RestaurantInsight,
@@ -91,10 +92,11 @@ export function postExplainChat(
   restaurantId: string,
   date: string,
   messages: ChatMessage[],
-  locale: SupportedLocale = "en",
+  locale: SupportedLocale | undefined = "en",
+  language?: LanguagePreference,
 ): Promise<ExplainChatResponse> {
   return http<ExplainChatResponse>("/api/explain/chat", {
     method: "POST",
-    body: JSON.stringify({ restaurantId, date, messages, locale }),
+    body: JSON.stringify({ restaurantId, date, messages, locale, language }),
   });
 }

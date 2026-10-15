@@ -1,5 +1,5 @@
-import { createSchema } from "graphql-yoga";
-import type { ChatMessage } from "@verdeai/shared-types";
+import { createGraphQLError, createSchema } from "graphql-yoga";
+import { isLanguagePreference, type ChatMessage } from "@verdeai/shared-types";
 import type { Repository } from "../data/repository.js";
 import type { ExplainService } from "../services/explainService.js";
 
@@ -73,6 +73,7 @@ const typeDefs = /* GraphQL */ `
   type ExplainChatResult {
     reply: ChatMessageResult!
     source: ExplanationSource!
+    language: String!
   }
 
   type Query {
@@ -86,8 +87,9 @@ const typeDefs = /* GraphQL */ `
     explainChat(
       restaurantId: String!
       date: String!
+      language: String
       messages: [ChatMessageInput!]!
-      locale: String = "en"
+      locale: String
     ): ExplainChatResult!
   }
 `;
@@ -114,7 +116,7 @@ export const schema = createSchema<GraphQLContext>({
           ctx.repository.listRestaurants(),
           ctx.repository.getForecasts(args.restaurantId, args.date),
           ctx.repository.getWasteRisk(args.restaurantId, args.date),
-          ctx.explainService.explain(args.restaurantId, args.date, args.locale),
+          ctx.explainService.explain(args.restaurantId, args.date, "auto", args.locale),
         ]);
         const restaurant = restaurants.find((r) => r.restaurantId === args.restaurantId) ?? {
           restaurantId: args.restaurantId,
@@ -133,18 +135,21 @@ export const schema = createSchema<GraphQLContext>({
     Mutation: {
       explainChat: async (
         _parent,
-        args: { restaurantId: string; date: string; messages: ChatMessage[]; locale?: string },
+        args: { restaurantId: string; date: string; messages: ChatMessage[]; locale?: string; language?: string },
         ctx,
       ) => {
+        if (args.language != null && !isLanguagePreference(args.language)) throw createGraphQLError("language must be auto or a supported language code");
         const result = await ctx.explainService.chat(
           args.restaurantId,
           args.date,
           args.messages,
-          args.locale,
+          args.language ?? "auto",
+          args.language == null ? args.locale : undefined,
         );
         return {
           reply: result.reply,
           source: toSourceEnum(result.source),
+          language: result.language,
         };
       },
     },
