@@ -5,6 +5,10 @@ import { useInsight } from "../hooks/useInsight";
 import { useExplainChat } from "../hooks/useExplainChat";
 import { useChatStore } from "../store/chatStore";
 import { useUiStore } from "../store/uiStore";
+import { speak, speechOutputSupported, stopSpeaking } from "../speech/synthesis";
+import { useRunVoiceCommand, useVoiceLang } from "../speech/useVoiceCommands";
+import { voiceStrings } from "../speech/voiceStrings";
+import { VoiceButton } from "./VoiceButton";
 
 import { useI18n } from "../i18n";
 
@@ -23,6 +27,10 @@ export function ExplainChatPanel() {
   const panel = panelStrings(language);
   const chatText = { explain: panel.title, loadingInsight: panel.loading, thinking: panel.thinking, placeholder: panel.placeholder, send: panel.send };
   const ui = (key: keyof typeof chatText) => language === "auto" && locale !== "en" ? t(key) : chatText[key];
+  const readAloud = useUiStore((s) => s.readAloud);
+  const setReadAloud = useUiStore((s) => s.setReadAloud);
+  const voiceLang = useVoiceLang();
+  const runVoiceCommand = useRunVoiceCommand(voiceLang);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   // Tracks which chatKeys have already been seeded, so the seed message is
@@ -53,6 +61,24 @@ export function ExplainChatPanel() {
     if (language !== "auto" && messages.length > 0) requestExplanation(language);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
+
+  // Speak only replies that arrive after this point, so switching the option on never replays the thread.
+  const spokenCountRef = useRef(messages.length);
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (readAloud && messages.length > spokenCountRef.current && last?.role === "assistant") speak(last.content, voiceLang);
+    spokenCountRef.current = messages.length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length]);
+  useEffect(() => { if (!readAloud) stopSpeaking(); }, [readAloud]);
+  useEffect(() => stopSpeaking, []);
+
+  // A spoken phrase is either a navigation command or a question for the assistant.
+  function handleVoice(text: string): boolean {
+    if (runVoiceCommand(text)) return true;
+    if (!isSending) sendMessage(text);
+    return true;
+  }
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -116,6 +142,19 @@ export function ExplainChatPanel() {
           className="min-h-11 min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-base focus:border-verde-500 focus:outline-none"
           disabled={isSending}
         />
+        {speechOutputSupported() && (
+          <button
+            type="button"
+            aria-pressed={readAloud}
+            aria-label={voiceStrings(voiceLang).readAloud}
+            title={voiceStrings(voiceLang).readAloud}
+            onClick={() => setReadAloud(!readAloud)}
+            className={`flex min-h-11 min-w-11 items-center justify-center rounded-md border px-3 text-sm ${readAloud ? "border-verde-500 bg-verde-600/20 text-verde-400" : "border-slate-700 text-slate-200 hover:bg-slate-800"}`}
+          >
+            <span aria-hidden="true">{readAloud ? "🔊" : "🔇"}</span>
+          </button>
+        )}
+        <VoiceButton lang={voiceLang} onTranscript={handleVoice} />
         <button
           type="submit"
           disabled={isSending || !draft.trim()}
