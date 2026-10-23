@@ -1,3 +1,6 @@
+import { useEffect } from "react";
+import { logConversion, logExposure } from "../experiments/tracking";
+import { useExperiment } from "../hooks/useExperiment";
 import { useInsight } from "../hooks/useInsight";
 import { useUiStore } from "../store/uiStore";
 
@@ -7,7 +10,15 @@ export function ForecastPanel() {
   const { t, number, date: formatDate } = useI18n();
   const restaurantId = useUiStore((s) => s.restaurantId);
   const date = useUiStore((s) => s.date);
+  const setActiveTab = useUiStore((s) => s.setActiveTab);
   const { data, isLoading, isError, refetch } = useInsight(restaurantId, date);
+  const variant = useExperiment("forecast-inline-risk");
+  const hasForecast = Boolean(data && data.forecasts.length > 0);
+
+  // Exposure counts only once the table the variant changes is actually on screen.
+  useEffect(() => {
+    if (hasForecast) logExposure("forecast-inline-risk");
+  }, [hasForecast]);
 
   if (isLoading) {
     return <p className="text-sm text-slate-400">{t("loadingForecast")}</p>;
@@ -24,6 +35,8 @@ export function ForecastPanel() {
   }
 
   const maxQty = Math.max(...data.forecasts.map((f) => f.predictedQuantity));
+  const showRisk = variant === "treatment";
+  const riskByItem = new Map(data.wasteRisk.map((w) => [w.item, w.riskScore]));
 
   return (
     <div>
@@ -38,6 +51,7 @@ export function ForecastPanel() {
               <th className="px-4 py-2 font-medium">{t("predicted")}</th>
               <th className="px-4 py-2 font-medium">{t("historical")}</th>
               <th className="px-4 py-2 font-medium">{t("trend")}</th>
+              {showRisk && <th className="px-4 py-2 font-medium">{t("wasteRisk")}</th>}
             </tr>
           </thead>
           <tbody>
@@ -56,6 +70,27 @@ export function ForecastPanel() {
                     />
                   </div>
                 </td>
+                {showRisk && (
+                  <td data-label={t("wasteRisk")} className="px-4 py-2">
+                    {riskByItem.has(f.item) && (
+                      <button
+                        type="button"
+                        data-testid="inline-risk-badge"
+                        onClick={() => {
+                          logConversion("forecast-inline-risk");
+                          setActiveTab("waste-risk");
+                        }}
+                        className={`min-h-8 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          riskByItem.get(f.item) === "HIGH"
+                            ? "bg-red-500/15 text-red-400"
+                            : "bg-verde-500/15 text-verde-400"
+                        }`}
+                      >
+                        {t(riskByItem.get(f.item) === "HIGH" ? "high" : "low")}
+                      </button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

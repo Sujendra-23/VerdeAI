@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { assignVariant } from "@verdeai/shared-types";
 
 // Network is mocked at the route level so this suite never depends on
 // apps/api actually running (let alone live Cosmos DB / Azure OpenAI creds).
@@ -33,7 +34,20 @@ const INSIGHT = {
   explanation: "Grilled Chicken Bowl is trending 43% above average — reduce prep by 15%.",
 };
 
+const EXPERIMENT_ID = "forecast-inline-risk";
+const experimentEvents: Array<Record<string, unknown>> = [];
+
+function userIn(variant: string): string {
+  for (let i = 0; i < 1000; i++) if (assignVariant(EXPERIMENT_ID, `e2e-${i}`) === variant) return `e2e-${i}`;
+  throw new Error(`no user for ${variant}`);
+}
+
 test.beforeEach(async ({ page }) => {
+  experimentEvents.length = 0;
+  await page.route("**/api/experiments/events", (route) => {
+    experimentEvents.push(route.request().postDataJSON());
+    return route.fulfill({ status: 201, json: { status: "recorded" } });
+  });
   await page.route("**/api/health", (route) =>
     route.fulfill({ json: { status: "ok", dataSource: "mock" } }),
   );
@@ -64,7 +78,7 @@ test("switching to Waste Risk shows the HIGH risk badge", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /waste risk/i }).click();
   // { exact: true } targets the risk badge itself, not the summary sentence
-  // above it ("1 of 1 items flagged HIGH risk today.") which also contains "HIGH".
+  // above it ("High-risk items today: 1 of 1.") which also contains "HIGH".
   await expect(page.getByText("HIGH", { exact: true })).toBeVisible();
 });
 
@@ -190,4 +204,51 @@ test("AI Explain chatbot answers in the language chosen in the selector", async 
   await page.getByRole("button", { name: "Enviar" }).click();
   await expect(page.getByText(/Reduce la preparación/)).toHaveCount(2);
   expect(requests[1]).toMatchObject({ language: "es" });
+});
+
+test("control managers see the forecast table without inline risk badges", async ({ page }) => {
+  const userId = userIn("control");
+  await page.addInitScript((id) => window.localStorage.setItem("verdeai.userId", id), userId);
+  await page.goto("/");
+  await expect(page.getByText("Grilled Chicken Bowl")).toBeVisible();
+  await expect(page.getByTestId("inline-risk-badge")).toHaveCount(0);
+  await expect.poll(() => experimentEvents).toEqual([
+    { experimentId: EXPERIMENT_ID, userId, variant: "control", type: "exposure" },
+  ]);
+});
+
+test("treatment managers see inline risk and clicking it opens Waste Risk and logs a conversion", async ({ page }) => {
+  const userId = userIn("treatment");
+  await page.addInitScript((id) => window.localStorage.setItem("verdeai.userId", id), userId);
+  await page.goto("/");
+  await expect(page.getByTestId("inline-risk-badge")).toHaveText(["HIGH"]);
+  await page.getByTestId("inline-risk-badge").click();
+  await expect(page.getByText("High-risk items today: 1 of 1.")).toBeVisible();
+  await expect.poll(() => experimentEvents.map((e) => e.type)).toEqual(["exposure", "conversion"]);
+  expect(experimentEvents[1]).toMatchObject({ userId, variant: "treatment", event: "waste_risk_opened" });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("experiment results page shows variant counts and the verdict", async ({ page }) => {
+  await page.route(`**/api/experiments/${EXPERIMENT_ID}/results`, (route) =>
+    route.fulfill({
+      json: {
+        experimentId: EXPERIMENT_ID,
+        conversionEvent: "waste_risk_opened",
+        variants: [
+          { variant: "control", exposures: 12, conversions: 3, rate: 0.25 },
+          { variant: "treatment", exposures: 10, conversions: 5, rate: 0.5 },
+        ],
+        lift: 1,
+        zScore: 1.1,
+        verdict: "not-enough-data",
+      },
+    }),
+  );
+  await page.goto("/#/experiments");
+  await expect(page.getByRole("heading", { name: /forecast-inline-risk/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /treatment 10 5 50\.0%/ })).toBeVisible();
+  await expect(page.getByTestId("experiment-verdict")).toContainText("Not enough data yet");
+  await page.getByRole("link", { name: "Back to dashboard" }).click();
+  await expect(page.getByRole("heading", { name: /demand forecast/i })).toBeVisible();
 });

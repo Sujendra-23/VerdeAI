@@ -80,6 +80,16 @@ path is covered by tests with a mocked HTTP call only (no live Azure run); and t
 standalone `VerdeAI_Explain` Azure Function accepts the five supported interface
 locales, while the orchestration API also supports the nine reply languages above.
 
+### A/B experiment: inline waste risk
+
+One experiment, `forecast-inline-risk`, shows how the dashboard can measure a change instead of guessing.
+
+- **Variants (50/50):** `control` is the plain forecast table. `treatment` adds a Waste Risk column to it; each badge is a button that opens the Waste Risk tab.
+- **Assignment:** `assignVariant` in `packages/shared-types/src/experiments.ts` hashes the experiment id and an anonymous per-browser id (FNV-1a) into a bucket from 0 to 99, so a manager keeps the same variant on every visit and the web app and API always agree.
+- **Events:** the dashboard sends an `exposure` once the forecast table is on screen, and a `conversion` (`waste_risk_opened`) when the manager opens Waste Risk, from either variant. `POST /api/experiments/events` re-computes the assignment and rejects a variant the user was not given, unknown experiments, and bad ids. Repeats are accepted but not recounted (202), and a conversion from a user with no exposure is ignored.
+- **Results:** `GET /api/experiments/forecast-inline-risk/results`, or open `/#/experiments` in the dashboard, shows distinct exposed and converted managers per variant, the rate, the relative lift, and a two-proportion z-test. No verdict is shown until each variant has 30 exposed managers; "significant" means |z| of at least 1.96.
+- **Limits:** counts live in API memory and reset on restart; there is no persistence or Cosmos storage. Event calls are fire-and-forget, so a down API never affects the dashboard. The results page is English only. This is a demo-scale experiment, not an analytics pipeline, and no real traffic has run through it.
+
 ## Tech stack
 
 - Azure Functions (Node.js) — nightly forecast + waste-risk batch jobs

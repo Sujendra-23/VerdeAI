@@ -4,6 +4,7 @@ import { createYoga } from "graphql-yoga";
 import { createRepository, type Repository } from "./data/repository.js";
 import { schema, type GraphQLContext } from "./graphql/schema.js";
 import { createRestRouter } from "./rest/routes.js";
+import { ExperimentStore } from "./services/experimentStore.js";
 import { ExplainService } from "./services/explainService.js";
 
 export function createServer(
@@ -16,7 +17,7 @@ export function createServer(
   app.use(cors());
   app.use(express.json());
 
-  app.use("/api", createRestRouter(repository, explainService));
+  app.use("/api", createRestRouter(repository, explainService, new ExperimentStore()));
 
   // Yoga's Node adapter matches against req.originalUrl (the full path),
   // not the Express-rewritten req.url — so graphqlEndpoint must be the same
