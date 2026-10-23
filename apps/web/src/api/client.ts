@@ -1,5 +1,7 @@
 import type {
   ChatMessage,
+  ExperimentId,
+  ExperimentResults,
   LanguagePreference,
   ExplainChatResponse,
   Restaurant,
@@ -99,4 +101,8 @@ export function postExplainChat(
     method: "POST",
     body: JSON.stringify({ restaurantId, date, messages, locale, language }),
   });
+}
+
+export function fetchExperimentResults(experimentId: ExperimentId): Promise<ExperimentResults> {
+  return http<ExperimentResults>(`/api/experiments/${experimentId}/results`);
 }

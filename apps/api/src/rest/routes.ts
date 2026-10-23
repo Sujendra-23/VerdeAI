@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { isLanguagePreference, type ChatMessage } from "@verdeai/shared-types";
+import { isExperimentId, isLanguagePreference, type ChatMessage, type ExperimentEvent } from "@verdeai/shared-types";
 import type { Repository } from "../data/repository.js";
+import type { ExperimentStore } from "../services/experimentStore.js";
 import type { ExplainService } from "../services/explainService.js";
 
 function requireQueryParams(
@@ -14,7 +15,11 @@ function requireQueryParams(
   return values as string[];
 }
 
-export function createRestRouter(repository: Repository, explainService: ExplainService): Router {
+export function createRestRouter(
+  repository: Repository,
+  explainService: ExplainService,
+  experimentStore: ExperimentStore,
+): Router {
   const router = Router();
 
   router.get("/health", (_req, res) => {
@@ -80,6 +85,26 @@ export function createRestRouter(repository: Repository, explainService: Explain
       language === undefined ? locale : undefined,
     );
     res.json(result);
+  });
+
+  // One exposure or conversion per request. Rejected events get a 400 with the reason;
+  // duplicates and conversions without an exposure are accepted but not counted (202).
+  router.post("/experiments/events", (req, res) => {
+    const outcome = experimentStore.record((req.body ?? {}) as ExperimentEvent);
+    if (outcome.status === "invalid") {
+      res.status(400).json({ error: outcome.reason });
+      return;
+    }
+    res.status(outcome.status === "recorded" ? 201 : 202).json({ status: outcome.status });
+  });
+
+  router.get("/experiments/:experimentId/results", (req, res) => {
+    const { experimentId } = req.params;
+    if (!isExperimentId(experimentId)) {
+      res.status(404).json({ error: "unknown experiment" });
+      return;
+    }
+    res.json(experimentStore.results(experimentId));
   });
 
   return router;
