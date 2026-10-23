@@ -80,6 +80,18 @@ path is covered by tests with a mocked HTTP call only (no live Azure run); and t
 standalone `VerdeAI_Explain` Azure Function accepts the five supported interface
 locales, while the orchestration API also supports the nine reply languages above.
 
+### Voice control
+
+The web dashboard can be operated by speech, using the browser's built-in Web Speech API (no new dependency, no VerdeAI server involved).
+
+- **Speak button** in the sidebar listens for one phrase and runs it as a command: "forecast", "waste risk", "explain" (with polite words like "open" or "show me"), or "stop" to silence spoken replies. A phrase must be a whole command, so "explain the salmon" is still a question.
+- **Speak button** in AI Explain dictates a question and sends it; if the phrase is a command it navigates instead.
+- **Speaker toggle** in AI Explain reads each new reply aloud in the dashboard's language.
+- **Language:** it listens and speaks in the reply language when one is chosen, otherwise in the interface language (English, Kannada, Hindi, French, Spanish, plus German, Portuguese, Italian, Chinese and Japanese from the reply-language picker). Recognition tags are in `apps/web/src/speech/voiceStrings.ts`.
+- Where the browser has no speech recognition (for example Firefox), the microphone button is hidden and the dashboard works as before.
+
+Limits: command words and voice-control labels are hand-written, not reviewed by native speakers; spoken replies in `auto` mode use the interface language, so a question typed in another language is still read with that voice; recognition quality and available voices depend on the browser and OS (Chrome and Edge work best, and Chrome sends audio to Google's service); only tab navigation is available by voice, not restaurant or date selection; tested with fake recognition and synthesis in Vitest and Playwright (Chromium), not with a real microphone, and not on WebKit.
+
 ### A/B experiment: inline waste risk
 
 One experiment, `forecast-inline-risk`, shows how the dashboard can measure a change instead of guessing.

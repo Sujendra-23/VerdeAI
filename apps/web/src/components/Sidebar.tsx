@@ -1,6 +1,9 @@
-import { logConversion } from "../experiments/tracking";
 import { useRestaurants } from "../hooks/useRestaurants";
+import { useOpenTab } from "../hooks/useOpenTab";
 import { type DashboardTab, useUiStore } from "../store/uiStore";
+import { useRunVoiceCommand, useVoiceLang } from "../speech/useVoiceCommands";
+import { getRecognitionConstructor } from "../speech/useSpeechRecognition";
+import { VoiceButton } from "./VoiceButton";
 
 import { useI18n } from "../i18n";
 
@@ -19,12 +22,14 @@ export function Sidebar() {
   const activeTab = useUiStore((s) => s.activeTab);
   const setRestaurantId = useUiStore((s) => s.setRestaurantId);
   const setDate = useUiStore((s) => s.setDate);
-  const setActiveTab = useUiStore((s) => s.setActiveTab);
+  const openTab = useOpenTab();
+  const voiceLang = useVoiceLang();
+  const runVoiceCommand = useRunVoiceCommand(voiceLang);
 
   const { data: restaurants, isLoading } = useRestaurants();
 
   return (
-    <aside className="dashboard-sidebar grid shrink-0 grid-cols-2 gap-3 border-b border-slate-800 p-4 md:flex md:w-64 md:flex-col md:gap-6 md:border-e md:border-b-0">
+    <aside className="dashboard-sidebar grid shrink-0 grid-cols-[1fr_1fr_auto] items-end gap-3 md:items-stretch border-b border-slate-800 p-4 md:flex md:w-64 md:flex-col md:gap-6 md:border-e md:border-b-0">
       <div className="min-w-0">
         <label
           htmlFor="restaurant-select"
@@ -68,17 +73,18 @@ export function Sidebar() {
         </select>
       </div>
 
+      {getRecognitionConstructor() && (
+        <div className="md:order-last">
+          <VoiceButton lang={voiceLang} onTranscript={runVoiceCommand} noteSide="below" />
+        </div>
+      )}
+
       <nav aria-label={t("dashboard")} className="dashboard-nav flex gap-1 md:flex-col">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            onClick={() => {
-              // Same conversion for both variants: the manager opened Waste Risk.
-              if (tab.id === "waste-risk") logConversion("forecast-inline-risk");
-              if (window.location.hash === "#/experiments") window.location.hash = "";
-              setActiveTab(tab.id);
-            }}
+            onClick={() => openTab(tab.id)}
             aria-current={activeTab === tab.id ? "page" : undefined}
             className={`min-h-12 flex-1 rounded-md px-2 py-2 text-center text-xs font-medium transition-colors md:flex-none md:px-3 md:text-start md:text-sm ${
               activeTab === tab.id
